@@ -80,3 +80,15 @@ if uploaded_file is not None:
         average_requests_per_minute = round(len(df) / duration_in_minutes, 2)
         st.text(
             f'平均リクエスト件数/分: {average_requests_per_minute} 件 / 分')
+
+    # ステータスコード 一覧
+    st.text('ステータスコードの分布')
+    status_distribution = df['Status'].value_counts()
+    st.write(status_distribution)
+
+    # 円グラフの作成
+    fig, ax = plt.subplots()
+    ax.pie(status_distribution.values,
+           labels=status_distribution.index, autopct='%1.1f%%')
+    ax.axis('equal')
+    st.pyplot(fig)
