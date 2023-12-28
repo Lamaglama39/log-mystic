@@ -1,6 +1,9 @@
+import user_agents
 import streamlit as st
 import pandas as pd
 import re
+import matplotlib.pyplot as plt
+import sys
 
 # set conig
 st.set_page_config(
@@ -55,18 +58,25 @@ if uploaded_file is not None:
         df = pd.DataFrame(parsed_data, columns=[
             'IP', 'Datetime', 'Method', 'Path', 'Status', 'Size', 'Referrer', 'User-Agent'])
 
+        # Datetime列をdatetime型に変換
+        df['Datetime'] = pd.to_datetime(
+            df['Datetime'], format='%d/%b/%Y:%H:%M:%S %z')
+
         # DataFrameの表示
         st.text('先頭10行の抜粋')
         st.write(df.head(10))
 
-        # ステータスコードの分布
-        st.text('ステータスコードの分布')
-        status_distribution = df['Status'].value_counts()
-        # print("Status Code Distribution:\n", status_distribution)
-        status_distribution
+        # ログ総数
+        st.text(f'アクセスログ総数: {len(df)}')
 
-        # ユーザーエージェントのトップ
-        st.text('ユーザーエージェントの分布')
-        top_user_agents = df['User-Agent'].value_counts().head(5)
-        top_user_agents
-        # print("Top 5 User Agents:\n", top_user_agents)
+        # ログ時間
+        min_time = df['Datetime'].min()
+        max_time = df['Datetime'].max()
+        st.text(
+            f'アクセスログ記録時間: {min_time} ~ {max_time}')
+
+    # 平均リクエスト件数/分の計算
+        duration_in_minutes = (max_time - min_time).total_seconds() / 60
+        average_requests_per_minute = round(len(df) / duration_in_minutes, 2)
+        st.text(
+            f'平均リクエスト件数/分: {average_requests_per_minute} 件 / 分')
