@@ -92,3 +92,23 @@ if uploaded_file is not None:
            labels=status_distribution.index, autopct='%1.1f%%')
     ax.axis('equal')
     st.pyplot(fig)
+
+    # ユーザーエージェントの解析
+    def parse_user_agent(ua_string):
+        ua = user_agents.parse(ua_string)
+        os_family = ua.os.family
+        browser_family = ua.browser.family
+        return pd.Series([os_family, browser_family])
+
+    df[['OS', 'Browser']] = df['User-Agent'].apply(parse_user_agent)
+
+    # OS の分布
+    st.text('OS の分布')
+    os_distribution = df['OS'].value_counts()
+    st.write(os_distribution)
+
+    # OS の円グラフ
+    fig, ax = plt.subplots()
+    ax.pie(os_distribution.values, labels=os_distribution.index, autopct='%1.1f%%')
+    ax.axis('equal')
+    st.pyplot(fig)
