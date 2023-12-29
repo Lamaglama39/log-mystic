@@ -112,3 +112,15 @@ if uploaded_file is not None:
     ax.pie(os_distribution.values, labels=os_distribution.index, autopct='%1.1f%%')
     ax.axis('equal')
     st.pyplot(fig)
+
+    # ブラウザの分布
+    st.text('ブラウザの分布')
+    browser_distribution = df['Browser'].value_counts()
+    st.write(browser_distribution)
+
+    # ブラウザの円グラフ
+    fig, ax = plt.subplots()
+    ax.pie(browser_distribution.values,
+           labels=browser_distribution.index, autopct='%1.1f%%')
+    ax.axis('equal')
+    st.pyplot(fig)
