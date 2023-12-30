@@ -2,6 +2,7 @@ import user_agents
 import streamlit as st
 import pandas as pd
 import re
+import requests
 import matplotlib.pyplot as plt
 import sys
 
@@ -33,8 +34,6 @@ genre = st.radio(
     "ファイル種別を選択してください",
     ["Apache", "Nginx"],
 )
-
-# st.write("You selected:", genre)
 
 # ファイルアップローダー
 # Streamlitでファイルをアップロードするウィジェットを作成
@@ -124,3 +123,35 @@ if uploaded_file is not None:
            labels=browser_distribution.index, autopct='%1.1f%%')
     ax.axis('equal')
     st.pyplot(fig)
+
+    # IPアドレスのカウント
+    ip_counts = df['IP'].value_counts().reset_index()
+    ip_counts.columns = ['IP', 'Count']
+
+    # 上位N件を取得（例としてトップ10）
+    top_n = 10
+    top_ips = ip_counts.head(top_n)
+
+    # ジオロケーション情報を取得する関数
+    def get_geolocation(ip):
+        try:
+            response = requests.get(f"https://ipinfo.io/{ip}/json")
+            data = response.json()
+            country = data.get('country', 'Unknown')
+            city = data.get('city', 'Unknown')
+            loc = data.get('loc', '')
+            if loc:
+                latitude, longitude = loc.split(',')
+            else:
+                latitude, longitude = 'Unknown', 'Unknown'
+        except Exception as e:
+            country, city, latitude, longitude = 'Unknown', 'Unknown', 'Unknown', 'Unknown'
+        return pd.Series([country, city, latitude, longitude])
+
+    # ジオロケーション情報の追加
+    top_ips[['Country', 'City', 'Latitude', 'Longitude']
+            ] = top_ips['IP'].apply(get_geolocation)
+
+    # 結果の表示
+    st.text('アクセス回数の多いクライアント一覧')
+    st.write(top_ips)
