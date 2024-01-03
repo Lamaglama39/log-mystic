@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install streamlit woothee matplotlib pycountry
+RUN pip3 install streamlit woothee matplotlib pycountry user_agents requests
 
 EXPOSE 8501
 
