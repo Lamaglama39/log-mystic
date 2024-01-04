@@ -44,8 +44,9 @@ if uploaded_file is not None:
     # ファイルの内容を読み込む
     data = uploaded_file.read().decode("utf-8").splitlines()
 
+    progress_text = "ログ解析 進捗状況"
+    progress_bar = st.progress(0, text=progress_text)
     # 正規表現パターン
-    st.write(genre)
     if genre == 'Apache' or 'Nginx':
         pattern = re.compile(
             r'(\S+) - - \[(\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ \+\d+)\] "(GET|POST) (.+?) HTTP/1.1" (\d+) (\d+) "(.*?)" "(.*?)"')
@@ -75,12 +76,13 @@ if uploaded_file is not None:
         st.text(
             f'アクセスログ記録時間: {min_time} ~ {max_time}')
 
-    # 平均リクエスト件数/分の計算
+        # 平均リクエスト件数/分の計算
         duration_in_minutes = (max_time - min_time).total_seconds() / 60
         average_requests_per_minute = round(len(df) / duration_in_minutes, 2)
         st.text(
             f'平均リクエスト件数/分: {average_requests_per_minute} 件 / 分')
 
+    progress_bar.progress(10)
     # ステータスコード 一覧
     st.text('ステータスコードの分布')
     status_distribution = df['Status'].value_counts()
@@ -93,7 +95,9 @@ if uploaded_file is not None:
     ax.axis('equal')
     st.pyplot(fig)
 
+    progress_bar.progress(20)
     # ユーザーエージェントの解析
+
     def parse_user_agent(ua_string):
         ua = user_agents.parse(ua_string)
         os_family = ua.os.family
@@ -102,6 +106,7 @@ if uploaded_file is not None:
 
     df[['OS', 'Browser']] = df['User-Agent'].apply(parse_user_agent)
 
+    progress_bar.progress(30)
     # OS の分布
     st.text('OS の分布')
     os_distribution = df['OS'].value_counts()
@@ -113,6 +118,7 @@ if uploaded_file is not None:
     ax.axis('equal')
     st.pyplot(fig)
 
+    progress_bar.progress(40)
     # ブラウザの分布
     st.text('ブラウザの分布')
     browser_distribution = df['Browser'].value_counts()
@@ -125,6 +131,7 @@ if uploaded_file is not None:
     ax.axis('equal')
     st.pyplot(fig)
 
+    progress_bar.progress(60)
     # IPアドレスのカウント
     ip_counts = df['IP'].value_counts().reset_index()
     ip_counts.columns = ['IP', 'Count']
@@ -157,6 +164,7 @@ if uploaded_file is not None:
     st.text('アクセス回数の多いクライアント一覧')
     st.write(top_ips)
 
+    progress_bar.progress(80)
     # 緯度と経度のデータ型を float に変換
     top_ips['Latitude'] = pd.to_numeric(top_ips['Latitude'], errors='coerce')
     top_ips['Longitude'] = pd.to_numeric(top_ips['Longitude'], errors='coerce')
@@ -229,3 +237,4 @@ if uploaded_file is not None:
 
     # 地図の表示
     st.pydeck_chart(r)
+    progress_bar.progress(100)
