@@ -49,7 +49,8 @@ if uploaded_file is not None:
     # 正規表現パターン
     if genre == 'Apache' or 'Nginx':
         pattern = re.compile(
-            r'(\S+) - - \[(\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ \+\d+)\] "(GET|POST) (.+?) HTTP/1.1" (\d+) (\d+) "(.*?)" "(.*?)"')
+            r'(\S+) - - \[(.*?)\] "(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH) (.+?) HTTP/1\.[01]" (\d+) (\d+) "(.*?)" "(.*?)"(?: (\S+))?$'
+        )
 
         # データの解析
         parsed_data = [pattern.match(line).groups()
@@ -57,11 +58,16 @@ if uploaded_file is not None:
 
         # DataFrameの作成
         df = pd.DataFrame(parsed_data, columns=[
-            'IP', 'Datetime', 'Method', 'Path', 'Status', 'Size', 'Referrer', 'User-Agent'])
+            'IP', 'Datetime', 'Method', 'Path', 'Status', 'Size', 'Referrer', 'User-Agent', 'ResponseTime'
+        ])
 
         # Datetime列をdatetime型に変換
         df['Datetime'] = pd.to_datetime(
             df['Datetime'], format='%d/%b/%Y:%H:%M:%S %z')
+
+        # Size列とResponseTime列を数値型に変換
+        df['Size'] = pd.to_numeric(df['Size'], errors='coerce')
+        df['ResponseTime'] = pd.to_numeric(df['ResponseTime'], errors='coerce')
 
         # DataFrameの表示
         st.text('先頭10行の抜粋')
@@ -81,6 +87,20 @@ if uploaded_file is not None:
         average_requests_per_minute = round(len(df) / duration_in_minutes, 2)
         st.text(
             f'平均リクエスト件数/分: {average_requests_per_minute} 件 / 分')
+
+        if 'ResponseTime' in df.columns and df['ResponseTime'].notnull().any():
+            average_response_time = df['ResponseTime'].mean()
+            median_response_time = df['ResponseTime'].median()
+            min_response_time = df['ResponseTime'].min()
+            max_response_time = df['ResponseTime'].max()
+
+            # 結果の表示
+            st.text(f'応答時間の平均: {average_response_time:.3f} 秒')
+            st.text(f'応答時間の中央値: {median_response_time:.3f} 秒')
+            st.text(f'応答時間の最小: {min_response_time:.3f} 秒')
+            st.text(f'応答時間の最大: {max_response_time:.3f} 秒')
+        else:
+            st.text('応答時間のデータが含まれていません。')
 
     progress_bar.progress(10)
     # ステータスコード 一覧
