@@ -105,7 +105,15 @@ if uploaded_file is not None:
     progress_bar.progress(10)
     # ステータスコードの分布
     st.text('ステータスコードの分布')
-    status_distribution = df['Status'].value_counts()
+
+    # ステータスコードのカウントを取得し、データフレームに変換
+    status_counts = df['Status'].value_counts().reset_index()
+    status_counts.columns = ['StatusCode', 'Count']
+
+    # 全体比(%)を計算
+    total_requests = len(df)
+    status_counts['Percentage (%)'] = (status_counts['Count'] /
+                                       total_requests * 100).round(2)
 
     # 2つの列を作成
     status1, status2 = st.columns(2)
@@ -113,14 +121,14 @@ if uploaded_file is not None:
     with status1:
         # 円グラフの作成
         fig, ax = plt.subplots()
-        ax.pie(status_distribution.values,
-               labels=status_distribution.index, autopct='%1.1f%%')
+        ax.pie(status_counts['Count'],
+               labels=status_counts['StatusCode'], autopct='%1.1f%%')
         ax.axis('equal')  # 円を真円にする
         st.pyplot(fig)
 
     with status2:
         # テーブルの表示
-        st.write(status_distribution)
+        st.write(status_counts)
 
     progress_bar.progress(20)
     # ユーザーエージェントの解析
@@ -134,28 +142,43 @@ if uploaded_file is not None:
     df[['OS', 'Browser']] = df['User-Agent'].apply(parse_user_agent)
 
     progress_bar.progress(30)
+
     # OS の分布
     st.text('OS の分布')
-    os_distribution = df['OS'].value_counts()
+
+    # OS のカウントを取得し、データフレームに変換
+    os_counts = df['OS'].value_counts().reset_index()
+    os_counts.columns = ['OS', 'Count']
+
+    # 全体比(%)を計算
+    total_os = os_counts['Count'].sum()
+    os_counts['Percentage (%)'] = (
+        os_counts['Count'] / total_os * 100).round(2)
 
     # 2つの列を作成
     os1, os2 = st.columns(2)
 
-    # OS の円グラフ
     with os1:
+        # 円グラフの作成
         fig, ax = plt.subplots()
-        ax.pie(os_distribution.values,
-               labels=os_distribution.index, autopct='%1.1f%%')
+        ax.pie(os_counts['Count'], labels=os_counts['OS'], autopct='%1.1f%%')
         ax.axis('equal')
         st.pyplot(fig)
 
     with os2:
-        st.write(os_distribution)
+        # テーブルの表示
+        st.write(os_counts)
 
     progress_bar.progress(40)
     # ブラウザの分布
     st.text('ブラウザの分布')
-    browser_distribution = df['Browser'].value_counts()
+    browser_counts = df['Browser'].value_counts().reset_index()
+    browser_counts.columns = ['Browser', 'Count']
+
+    # 全体比(%)を計算
+    total_browser = browser_counts['Count'].sum()
+    browser_counts['Percentage (%)'] = (
+        browser_counts['Count'] / total_browser * 100).round(2)
 
     # 2つの列を作成
     browser1, browser2 = st.columns(2)
@@ -163,13 +186,13 @@ if uploaded_file is not None:
     # ブラウザの円グラフ
     with browser1:
         fig, ax = plt.subplots()
-        ax.pie(browser_distribution.values,
-               labels=browser_distribution.index, autopct='%1.1f%%')
+        ax.pie(browser_counts['Count'],
+               labels=browser_counts['Browser'], autopct='%1.1f%%')
         ax.axis('equal')
         st.pyplot(fig)
 
     with browser2:
-        st.write(browser_distribution)
+        st.write(browser_counts)
 
     progress_bar.progress(60)
     # IPアドレスのカウント
