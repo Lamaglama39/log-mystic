@@ -1,24 +1,12 @@
-import user_agents
 import streamlit as st
-import pandas as pd
-import re
-import requests
-import matplotlib.pyplot as plt
-import sys
-import pydeck as pdk
 
-# set conig
-st.set_page_config(
-    page_title="LogMystic",
-    page_icon="❓",
-    # layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': 'https://github.com/Lamaglama39/log-mystic',
-        'Report a bug': 'https://github.com/Lamaglama39/log-mystic',
-        'About': "Log Search app!"
-    }
-)
+import modules.config
+import modules.log_pattern
+import modules.log_analysis
+import modules.overview
+import modules.pie_graph
+import modules.line_graph
+import modules.map_graph
 
 # タイトル
 st.title("LogMystic")
@@ -44,332 +32,56 @@ if uploaded_file is not None:
     # ファイルの内容を読み込む
     data = uploaded_file.read().decode("utf-8").splitlines()
 
+    # プログレスバー
     progress_text = "ログ解析 進捗状況"
     progress_bar = st.progress(0, text=progress_text)
-    # 正規表現パターン
+
+    # アクセスログ判別
     if genre == 'Apache' or 'Nginx':
-        pattern = re.compile(
-            r'(\S+) - - \[(.*?)\] "(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH) (.+?) HTTP/1\.[01]" (\d+) (\d+) "(.*?)" "(.*?)"(?: (\S+))?$'
-        )
+        # アクセスログ解析
+        pattern = modules.log_pattern.log_pattern()
+        df = modules.log_analysis.log_analysis(pattern, data)
 
-        # データの解析
-        parsed_data = [pattern.match(line).groups()
-                       for line in data if pattern.match(line)]
-
-        # DataFrameの作成
-        df = pd.DataFrame(parsed_data, columns=[
-            'IP', 'Datetime', 'Method', 'Path', 'Status', 'Size', 'Referrer', 'User-Agent', 'ResponseTime'
-        ])
-
-        # Datetime列をdatetime型に変換
-        df['Datetime'] = pd.to_datetime(
-            df['Datetime'], format='%d/%b/%Y:%H:%M:%S %z')
-
-        # Size列とResponseTime列を数値型に変換
-        df['Size'] = pd.to_numeric(df['Size'], errors='coerce')
-        df['ResponseTime'] = pd.to_numeric(df['ResponseTime'], errors='coerce')
-
-        # DataFrameの表示
-        st.text('先頭10行の抜粋')
-        st.write(df.head(10))
-
-        # ログ総数
-        st.text(f'アクセスログ総数: {len(df)}')
-
-        # ログ時間
-        min_time = df['Datetime'].min()
-        max_time = df['Datetime'].max()
-        st.text(
-            f'アクセスログ記録時間: {min_time} ~ {max_time}')
-
-        # 平均リクエスト件数/分の計算
-        duration_in_minutes = (max_time - min_time).total_seconds() / 60
-        average_requests_per_minute = round(len(df) / duration_in_minutes, 2)
-        st.text(
-            f'平均リクエスト件数/分: {average_requests_per_minute} 件 / 分')
-
-        if 'ResponseTime' in df.columns and df['ResponseTime'].notnull().any():
-            average_response_time = df['ResponseTime'].mean()
-            median_response_time = df['ResponseTime'].median()
-            min_response_time = df['ResponseTime'].min()
-            max_response_time = df['ResponseTime'].max()
-
-            # 結果の表示
-            st.text(f'応答時間の平均: {average_response_time:.3f} 秒')
-            st.text(f'応答時間の中央値: {median_response_time:.3f} 秒')
-            st.text(f'応答時間の最小: {min_response_time:.3f} 秒')
-            st.text(f'応答時間の最大: {max_response_time:.3f} 秒')
-        else:
-            st.text('応答時間のデータが含まれていません。')
-
+    # 解析概要
+    modules.overview.overview(df)
     progress_bar.progress(10)
+
     # ステータスコードの分布
-    st.text('ステータスコードの分布')
-
-    # ステータスコードのカウントを取得し、データフレームに変換
-    status_counts = df['Status'].value_counts().reset_index()
-    status_counts.columns = ['StatusCode', 'Count']
-
-    # 全体比(%)を計算
-    total_requests = len(df)
-    status_counts['Percentage (%)'] = (status_counts['Count'] /
-                                       total_requests * 100).round(2)
-
-    # 2つの列を作成
-    status1, status2 = st.columns(2)
-
-    with status1:
-        # 円グラフの作成
-        fig, ax = plt.subplots()
-        ax.pie(status_counts['Count'],
-               labels=status_counts['StatusCode'], autopct='%1.1f%%')
-        ax.axis('equal')  # 円を真円にする
-        st.pyplot(fig)
-
-    with status2:
-        # テーブルの表示
-        st.write(status_counts)
+    modules.pie_graph.statuscord_graph(df)
 
     progress_bar.progress(20)
-    # ユーザーエージェントの解析
-
-    def parse_user_agent(ua_string):
-        ua = user_agents.parse(ua_string)
-        os_family = ua.os.family
-        browser_family = ua.browser.family
-        return pd.Series([os_family, browser_family])
-
-    df[['OS', 'Browser']] = df['User-Agent'].apply(parse_user_agent)
-
-    progress_bar.progress(30)
-
     # OS の分布
-    st.text('OS の分布')
-
-    # OS のカウントを取得し、データフレームに変換
-    os_counts = df['OS'].value_counts().reset_index()
-    os_counts.columns = ['OS', 'Count']
-
-    # 全体比(%)を計算
-    total_os = os_counts['Count'].sum()
-    os_counts['Percentage (%)'] = (
-        os_counts['Count'] / total_os * 100).round(2)
-
-    # 2つの列を作成
-    os1, os2 = st.columns(2)
-
-    with os1:
-        # 円グラフの作成
-        fig, ax = plt.subplots()
-        ax.pie(os_counts['Count'], labels=os_counts['OS'], autopct='%1.1f%%')
-        ax.axis('equal')
-        st.pyplot(fig)
-
-    with os2:
-        # テーブルの表示
-        st.write(os_counts)
+    modules.pie_graph.os_graph(df)
 
     progress_bar.progress(40)
     # ブラウザの分布
-    st.text('ブラウザの分布')
-    browser_counts = df['Browser'].value_counts().reset_index()
-    browser_counts.columns = ['Browser', 'Count']
+    modules.pie_graph.browser_graph(df)
 
-    # 全体比(%)を計算
-    total_browser = browser_counts['Count'].sum()
-    browser_counts['Percentage (%)'] = (
-        browser_counts['Count'] / total_browser * 100).round(2)
+    progress_bar.progress(50)
 
-    # 2つの列を作成
-    browser1, browser2 = st.columns(2)
+    # 棒グラフ
+    status_num = modules.line_graph.num_conversion(df)
 
-    # ブラウザの円グラフ
-    with browser1:
-        fig, ax = plt.subplots()
-        ax.pie(browser_counts['Count'],
-               labels=browser_counts['Browser'], autopct='%1.1f%%')
-        ax.axis('equal')
-        st.pyplot(fig)
+    modules.line_graph.load_status(status_num)
+    progress_bar.progress(50)
 
-    with browser2:
-        st.write(browser_counts)
+    modules.line_graph.error_status(status_num)
+    progress_bar.progress(50)
 
-    # ステータスコードを数値型に変換
-    df['Status'] = pd.to_numeric(df['Status'], errors='coerce')
+    modules.line_graph.client_error_status(status_num)
+    progress_bar.progress(50)
 
-    # 日時を1分単位に丸める
-    df['Time'] = df['Datetime'].dt.floor('T')
-
-    # 負荷状況の線グラフ
-    # 時間ごとのリクエスト数を集計
-    requests_per_time = df.groupby('Time').size().reset_index(name='Requests')
-
-    # グラフの作成
-    st.text('負荷状況（時間ごとのリクエスト数）')
-    fig, ax = plt.subplots()
-    ax.plot(requests_per_time['Time'], requests_per_time['Requests'])
-    ax.set_xlabel('time')
-    ax.set_ylabel('request count')
-    ax.tick_params(axis='x', rotation=45)
-    st.pyplot(fig)
-
-    # エラー発生状況の線グラフ
-    # エラー（4XXおよび5XX）のフィルタリング
-    df['Error'] = df['Status'].between(400, 599)
-
-    # 時間ごとのエラー数を集計
-    errors_per_time = df[df['Error']].groupby(
-        'Time').size().reset_index(name='Errors')
-
-    # グラフの作成
-    st.text('エラー発生状況（時間ごとのエラー数）')
-    fig, ax = plt.subplots()
-    ax.plot(errors_per_time['Time'], errors_per_time['Errors'])
-    ax.set_xlabel('time')
-    ax.set_ylabel('error count')
-    ax.tick_params(axis='x', rotation=45)
-    st.pyplot(fig)
-
-    # クライアントエラー発生状況 (4XX) の線グラフ
-    # クライアントエラー（4XX）のフィルタリング
-    df['ClientError'] = df['Status'].between(400, 499)
-
-    # 時間ごとの4XXエラー数を集計
-    client_errors_per_time = df[df['ClientError']].groupby(
-        'Time').size().reset_index(name='ClientErrors')
-
-    # グラフの作成
-    st.text('クライアントエラー発生状況（時間ごとの4XXエラー数）')
-    fig, ax = plt.subplots()
-    ax.plot(client_errors_per_time['Time'],
-            client_errors_per_time['ClientErrors'])
-    ax.set_xlabel('time')
-    ax.set_ylabel('4XX error count')
-    ax.tick_params(axis='x', rotation=45)
-    st.pyplot(fig)
-
-    # サーバエラー発生状況 (5XX) の線グラフ
-    # サーバエラー（5XX）のフィルタリング
-    df['ServerError'] = df['Status'].between(500, 599)
-
-    # 時間ごとの5XXエラー数を集計
-    server_errors_per_time = df[df['ServerError']].groupby(
-        'Time').size().reset_index(name='ServerErrors')
-
-    # グラフの作成
-    st.text('サーバエラー発生状況（時間ごとの5XXエラー数）')
-    fig, ax = plt.subplots()
-    ax.plot(server_errors_per_time['Time'],
-            server_errors_per_time['ServerErrors'])
-    ax.set_xlabel('time')
-    ax.set_ylabel('5XX error count')
-    ax.tick_params(axis='x', rotation=45)
-    st.pyplot(fig)
+    modules.line_graph.server_error_status(status_num)
+    progress_bar.progress(50)
 
     progress_bar.progress(60)
-    # IPアドレスのカウント
-    ip_counts = df['IP'].value_counts().reset_index()
-    ip_counts.columns = ['IP', 'Count']
 
-    # 上位N件を取得（例としてトップ10）
-    top_n = 10
-    top_ips = ip_counts.head(top_n)
+    # アクセス数の多いクライアント
+    top_ips = modules.map_graph.geolocation(df)
 
-    # ジオロケーション情報を取得する関数
-    def get_geolocation(ip):
-        try:
-            response = requests.get(f"https://ipinfo.io/{ip}/json")
-            data = response.json()
-            country = data.get('country', 'Unknown')
-            city = data.get('city', 'Unknown')
-            loc = data.get('loc', '')
-            if loc:
-                latitude, longitude = loc.split(',')
-            else:
-                latitude, longitude = 'Unknown', 'Unknown'
-        except Exception as e:
-            country, city, latitude, longitude = 'Unknown', 'Unknown', 'Unknown', 'Unknown'
-        return pd.Series([country, city, latitude, longitude])
-
-    # ジオロケーション情報の追加
-    top_ips[['Country', 'City', 'Latitude', 'Longitude']
-            ] = top_ips['IP'].apply(get_geolocation)
-
-    # 結果の表示
-    st.text('アクセス回数の多いクライアント一覧')
-    st.write(top_ips)
-
+    modules.map_graph.frequently_accessed_clients(top_ips)
     progress_bar.progress(80)
-    # 緯度と経度のデータ型を float に変換
-    top_ips['Latitude'] = pd.to_numeric(top_ips['Latitude'], errors='coerce')
-    top_ips['Longitude'] = pd.to_numeric(top_ips['Longitude'], errors='coerce')
 
-    # 緯度と経度のデータが存在する行のみを抽出
-    top_ips_clean = top_ips.dropna(subset=['Latitude', 'Longitude'])
-
-    # 列名の変更
-    top_ips_clean = top_ips_clean.rename(
-        columns={'Latitude': 'latitude', 'Longitude': 'longitude'})
-
-    # サイズ列の追加（アクセス回数をサイズに使用）
-    top_ips_clean['size'] = top_ips_clean['Count']
-
-    # カラーコードの作成（国ごとに色分け）
-    import matplotlib.cm as cm
-    import matplotlib.colors as colors
-
-    # 国名をカテゴリカルデータに変換し、整数の色コードにマッピング
-    top_ips_clean['color_code'] = top_ips_clean['Country'].astype(
-        'category').cat.codes
-
-    # ユニークな国の数を取得
-    num_countries = top_ips_clean['color_code'].nunique()
-
-    # カラーマップを取得
-    colormap = cm.get_cmap('tab20', num_countries)
-
-    # color_code を RGB 値に変換
-    def map_color_code_to_rgb(color_code):
-        rgb = colormap(color_code)[:3]  # RGBAのうちRGBを取得
-        return [int(c * 255) for c in rgb]
-
-    top_ips_clean['color'] = top_ips_clean['color_code'].apply(
-        map_color_code_to_rgb)
-
-    # pydeck を使用して地図を表示
-    import pydeck as pdk
-
-    # レイヤーの定義
-    layer = pdk.Layer(
-        'ScatterplotLayer',
-        data=top_ips_clean,
-        get_position='[longitude, latitude]',
-        get_radius='size * 1000',  # 固定サイズに設定（適宜調整）
-        get_fill_color='color',  # 赤色に固定
-        pickable=True
-    )
-
-    # ビューの定義
-    view_state = pdk.ViewState(
-        longitude=top_ips_clean['longitude'].mean(),
-        latitude=top_ips_clean['latitude'].mean(),
-        zoom=1,
-        pitch=0
-    )
-
-    # ツールチップの定義
-    tooltip = {
-        "html": "<b>IP:</b> {IP} <br/> <b>Count:</b> {Count} <br/> <b>Country:</b> {Country} <br/> <b>City:</b> {City}",
-        "style": {"color": "white"}
-    }
-
-    # Deck の定義
-    r = pdk.Deck(
-        layers=[layer],
-        initial_view_state=view_state,
-        tooltip=tooltip
-    )
-
-    # 地図の表示
-    st.pydeck_chart(r)
+    # クライアントを地図上にマッピング
+    modules.map_graph.client_map_graph(top_ips)
     progress_bar.progress(100)
